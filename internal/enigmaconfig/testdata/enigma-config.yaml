@@ -1,0 +1,17 @@
+modules:
+  core:
+    api_versions:
+      - v1
+    settings:
+      standalone: true
+
+  hr:
+    api_versions:
+      - v1
+    submodules:
+      core:
+        api_versions:
+          - v1
+      roster:
+        api_versions:
+          - v1

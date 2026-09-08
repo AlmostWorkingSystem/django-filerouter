@@ -1,0 +1,8 @@
+modules:
+  hr:
+    api_versions:
+      - v1
+    submodules:
+      core:
+        api_versions:
+          - v1

@@ -1,0 +1,6 @@
+modules:
+  core:
+    api_versions:
+      - v1
+    settings:
+      standalone: false
