@@ -1,0 +1,6 @@
+modules:
+  demo:
+    api_versions:
+      - v1
+    settings:
+      standalone: true
