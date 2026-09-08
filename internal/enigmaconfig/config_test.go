@@ -57,6 +57,20 @@ func TestLoad_ConflictOnExplicitStandaloneFalse(t *testing.T) {
 	}
 }
 
+func TestLoad_MalformedStandaloneOnNonCoreModuleIsHardError(t *testing.T) {
+	_, err := loadFile("testdata/enigma-config-malformed-standalone.yaml")
+	if err == nil {
+		t.Fatalf("want hard error for malformed (non-boolean) standalone value, got nil")
+	}
+}
+
+func TestLoad_MalformedCoreStandaloneIsHardError(t *testing.T) {
+	_, err := loadFile("testdata/enigma-config-malformed-core-standalone.yaml")
+	if err == nil {
+		t.Fatalf("want hard error for malformed (non-boolean) core.settings.standalone value, got nil")
+	}
+}
+
 func TestLoad_EmptyConfigSynthesizesCore(t *testing.T) {
 	cfg, err := loadFile("testdata/enigma-config-empty.yaml")
 	if err != nil {

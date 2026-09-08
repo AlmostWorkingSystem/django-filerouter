@@ -67,10 +67,12 @@ func loadFile(path string) (*Config, error) {
 
 	var entries []ModuleEntry
 	for i := 0; i < len(modulesNode.Content); i += 2 {
-		entries = append(entries, ModuleEntry{
-			Name:   modulesNode.Content[i].Value,
-			Module: parseModule(modulesNode.Content[i+1]),
-		})
+		name := modulesNode.Content[i].Value
+		mod, err := parseModule(modulesNode.Content[i+1])
+		if err != nil {
+			return nil, fmt.Errorf("module %q: %w", name, err)
+		}
+		entries = append(entries, ModuleEntry{Name: name, Module: mod})
 	}
 	return &Config{Modules: entries}, nil
 }
@@ -87,14 +89,18 @@ func mappingValue(mapping *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-func parseModule(node *yaml.Node) Module {
+func parseModule(node *yaml.Node) (Module, error) {
 	var m Module
 	if v := mappingValue(node, "api_versions"); v != nil {
 		m.APIVersions = scalarValues(v)
 	}
 	if v := mappingValue(node, "settings"); v != nil {
 		if s := mappingValue(v, "standalone"); s != nil {
-			m.Settings.Standalone, _ = strconv.ParseBool(s.Value)
+			standalone, err := strconv.ParseBool(s.Value)
+			if err != nil {
+				return Module{}, fmt.Errorf("settings.standalone: invalid boolean %q: %w", s.Value, err)
+			}
+			m.Settings.Standalone = standalone
 		}
 	}
 	if v := mappingValue(node, "submodules"); v != nil {
@@ -105,7 +111,7 @@ func parseModule(node *yaml.Node) Module {
 			})
 		}
 	}
-	return m
+	return m, nil
 }
 
 func parseSubmodule(node *yaml.Node) Submodule {
@@ -156,7 +162,11 @@ func applyCoreDefaults(modulesNode *yaml.Node) error {
 			coreNode.Content = append(coreNode.Content, strNode("settings"), settings)
 		}
 		if standalone := mappingValue(settings, "standalone"); standalone != nil {
-			if v, _ := strconv.ParseBool(standalone.Value); !v {
+			v, err := strconv.ParseBool(standalone.Value)
+			if err != nil {
+				return fmt.Errorf("core.settings.standalone: invalid boolean %q: %w", standalone.Value, err)
+			}
+			if !v {
 				return fmt.Errorf("conflict at core.settings.standalone")
 			}
 		} else {
