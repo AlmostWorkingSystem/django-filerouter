@@ -17,9 +17,15 @@ type Event struct {
 }
 
 // filter replicates WatchDogReloader's should_skip_event debounce plus its
-// on_any_event qualifying rule (modules/core/management/commands/server.py:33-88):
-// only Create/Remove/Rename of a .py file under a path containing "/api/",
-// never _routes.py, and never the same path twice within `debounce`.
+// PatternMatchingEventHandler pattern match (modules/core/management/commands/server.py:99-105):
+// patterns=["*.py", "*.html", ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"].
+// This is the single "does this event even get considered" gate — it
+// accepts ALL fsnotify ops (Create, Write, Remove, Rename), matching
+// Python's on_any_event being invoked for every non-ignored, non-debounced
+// event regardless of type. It does NOT decide whether to regenerate
+// makeurls (see IsAPIFileChange) or whether to restart (every event that
+// passes this gate restarts, per Python's unconditional
+// self.process.terminate(); self.start() at the end of on_any_event).
 type filter struct {
 	debounce time.Duration
 	mu       sync.Mutex
@@ -30,17 +36,29 @@ func newFilter(debounce time.Duration) *filter {
 	return &filter{debounce: debounce, last: map[string]time.Time{}}
 }
 
+// isQualifyingPath implements the PatternMatchingEventHandler patterns
+// Python's WatchDogReloader is constructed with: never _routes.py, never a
+// path under __pycache__, and a suffix of .py or .html, or the exact
+// basename ".env" (patterns=["*.py", "*.html", ".env"],
+// ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"]).
+func isQualifyingPath(name string) bool {
+	base := filepath.Base(name)
+	if base == "_routes.py" {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(name), "/") {
+		if part == "__pycache__" {
+			return false
+		}
+	}
+	if base == ".env" {
+		return true
+	}
+	return strings.HasSuffix(name, ".py") || strings.HasSuffix(name, ".html")
+}
+
 func (f *filter) shouldTrigger(ev fsnotify.Event) bool {
-	if !strings.HasSuffix(ev.Name, ".py") {
-		return false
-	}
-	if strings.HasSuffix(ev.Name, "_routes.py") {
-		return false
-	}
-	if !strings.Contains(ev.Name, "/api/") {
-		return false
-	}
-	if ev.Op&(fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
+	if !isQualifyingPath(ev.Name) {
 		return false
 	}
 
@@ -54,8 +72,29 @@ func (f *filter) shouldTrigger(ev fsnotify.Event) bool {
 	return true
 }
 
+// IsAPIFileChange reports whether ev should trigger a makeurls regeneration
+// (and API-file scaffold), matching Python's narrower "regenerate" gate
+// (modules/core/management/commands/server.py:65-69):
+//
+//	not event.event_type == EVENT_TYPE_MODIFIED and src_path.endswith(".py") and "/api/" in src_path
+//
+// i.e. Create/Remove/Rename (never plain Write) of a .py file whose path
+// contains "/api/". This is strictly narrower than the debounced gate that
+// decides whether onQualifying fires at all (filter.shouldTrigger) — every
+// event reaching onQualifying should restart the server, but only events
+// satisfying IsAPIFileChange should also regenerate routes.
+func IsAPIFileChange(ev Event) bool {
+	if ev.Op == fsnotify.Write {
+		return false
+	}
+	return strings.HasSuffix(ev.Path, ".py") && strings.Contains(ev.Path, "/api/")
+}
+
 // Watch recursively watches root and calls onQualifying for every
-// debounced Create/Remove/Rename of a .py file under an /api/ directory.
+// debounced filesystem event matching the *.py/*.html/.env patterns
+// (excluding _routes.py and __pycache__), regardless of op type. Use
+// IsAPIFileChange on the resulting Event to decide whether it also
+// warrants a makeurls regeneration.
 // It returns a stop function to tear the watcher down.
 func Watch(root string, debounce time.Duration, onQualifying func(Event)) (func(), error) {
 	w, err := fsnotify.NewWatcher()

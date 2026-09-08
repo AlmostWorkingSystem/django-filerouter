@@ -75,13 +75,21 @@ func runServer(args []string) {
 	}
 
 	stopWatch, err := watch.Watch(*root, 500*time.Millisecond, func(ev watch.Event) {
-		if ev.Op&fsnotify.Create != 0 {
-			maybeScaffold(ev.Path)
-		}
-		fmt.Println("Regenerating URLs due to file change:", ev.Path)
-		if _, err := appgen.Generate(*root); err != nil {
-			fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _routes.py:", err)
-			return
+		// IsAPIFileChange gates the narrower "regenerate routes" behavior;
+		// every qualifying event reaching this callback restarts the
+		// supervised server regardless, matching the real Python dev
+		// server's unconditional process.terminate()/start() at the end of
+		// on_any_event.
+		if watch.IsAPIFileChange(ev) {
+			if ev.Op&fsnotify.Create != 0 {
+				maybeScaffold(ev.Path)
+			}
+			fmt.Println("Regenerating URLs due to file change:", ev.Path)
+			if _, err := appgen.Generate(*root); err != nil {
+				fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _routes.py:", err)
+			}
+		} else {
+			fmt.Println("Restarting server due to file change:", ev.Path)
 		}
 		if err := sup.Restart(); err != nil {
 			fmt.Fprintln(os.Stderr, "restart failed:", err)
