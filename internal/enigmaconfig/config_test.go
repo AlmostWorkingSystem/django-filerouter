@@ -56,3 +56,22 @@ func TestLoad_ConflictOnExplicitStandaloneFalse(t *testing.T) {
 		t.Fatalf("want conflict error, got nil")
 	}
 }
+
+func TestLoad_EmptyConfigSynthesizesCore(t *testing.T) {
+	cfg, err := loadFile("testdata/enigma-config-empty.yaml")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Modules) != 1 {
+		t.Fatalf("want synthetic core module for empty config, got %d modules", len(cfg.Modules))
+	}
+	if cfg.Modules[0].Name != "core" {
+		t.Fatalf("want core module, got %s", cfg.Modules[0].Name)
+	}
+	if !cfg.Modules[0].Module.Settings.Standalone {
+		t.Fatalf("want core standalone true")
+	}
+	if len(cfg.Modules[0].Module.APIVersions) != 1 || cfg.Modules[0].Module.APIVersions[0] != "v1" {
+		t.Fatalf("want core api_versions [v1], got %v", cfg.Modules[0].Module.APIVersions)
+	}
+}

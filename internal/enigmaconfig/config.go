@@ -53,11 +53,11 @@ func loadFile(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
-	if len(doc.Content) == 0 {
-		return &Config{}, nil
-	}
 
-	modulesNode := mappingValue(doc.Content[0], "modules")
+	var modulesNode *yaml.Node
+	if len(doc.Content) > 0 {
+		modulesNode = mappingValue(doc.Content[0], "modules")
+	}
 	if modulesNode == nil {
 		modulesNode = &yaml.Node{Kind: yaml.MappingNode}
 	}
