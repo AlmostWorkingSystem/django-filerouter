@@ -4,8 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
+
+	"github.com/AlmostWorkingSystem/enigma-cli/internal/apitemplate"
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/appgen"
+	"github.com/AlmostWorkingSystem/enigma-cli/internal/supervisor"
+	"github.com/AlmostWorkingSystem/enigma-cli/internal/watch"
 )
 
 func main() {
@@ -44,6 +52,60 @@ func runMakeURLs(args []string) {
 }
 
 func runServer(args []string) {
-	fmt.Fprintln(os.Stderr, "server subcommand not yet implemented")
-	os.Exit(1)
+	fs := flag.NewFlagSet("server", flag.ExitOnError)
+	root := fs.String("root", ".", "path to the Django project root")
+	fs.Parse(args)
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] <addr>")
+		os.Exit(1)
+	}
+	addr := fs.Arg(0)
+
+	elapsed, err := appgen.Generate(*root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "initial makeurls failed:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("URL generation completed in %s.\n", elapsed)
+
+	sup := supervisor.New(*root, "./manage.py", "runsslserver", addr)
+	if err := sup.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "starting runsslserver failed:", err)
+		os.Exit(1)
+	}
+
+	stopWatch, err := watch.Watch(*root, 500*time.Millisecond, func(ev watch.Event) {
+		if ev.Op&fsnotify.Create != 0 {
+			maybeScaffold(ev.Path)
+		}
+		fmt.Println("Regenerating URLs due to file change:", ev.Path)
+		if _, err := appgen.Generate(*root); err != nil {
+			fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _routes.py:", err)
+			return
+		}
+		if err := sup.Restart(); err != nil {
+			fmt.Fprintln(os.Stderr, "restart failed:", err)
+		}
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "starting watcher failed:", err)
+		sup.Stop()
+		os.Exit(1)
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	stopWatch()
+	sup.Stop()
+}
+
+func maybeScaffold(path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.Size() != 0 {
+		return
+	}
+	content := apitemplate.Render(path)
+	_ = os.WriteFile(path, []byte(content), 0o644)
 }
