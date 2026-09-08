@@ -45,6 +45,16 @@ func TestScanViewFile_ReadsURLName(t *testing.T) {
 	}
 }
 
+func TestScanViewFile_ReadsURLPrefix(t *testing.T) {
+	info, err := ScanViewFile("testdata/view_with_url_prefix.py")
+	if err != nil {
+		t.Fatalf("ScanViewFile: %v", err)
+	}
+	if info.URLPrefix == nil || *info.URLPrefix != "employees" {
+		t.Fatalf("want url_prefix override, got %+v", info)
+	}
+}
+
 func TestScanViewFile_NoAPIView(t *testing.T) {
 	info, err := ScanViewFile("testdata/not_a_view.py")
 	if err != nil {
