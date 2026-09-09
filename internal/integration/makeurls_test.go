@@ -15,11 +15,11 @@ import (
 )
 
 // TestMakeURLsMatchesPythonOutput compares enigma-cli's Eager-mode output
-// against the real camera_infra checkout's existing, Python-generated
-// _routes.py. It never writes anything — pure read + diff. Eager mode is
-// the production format and is still byte-compatible in shape with what
-// Config.save_urls produces, so this keeps the original line-set
-// comparison from the design spec.
+// against the real camera_infra checkout's existing, previously-generated
+// _enigma.py (Eager mode's import/path lines are still byte-compatible in
+// shape with what the original Config.save_urls produced for _routes.py —
+// see the design spec — so this keeps the original line-set comparison).
+// It never writes anything — pure read + diff.
 //
 // Route/import order *within* a given api version must match exactly (it's
 // fully determined by the yaml and the filesystem tree). The outer
@@ -28,14 +28,14 @@ import (
 // listing order with no defined contract — see the design doc's Testing
 // section. So this test compares import lines and path(...) lines as sets.
 func TestMakeURLsMatchesPythonOutput(t *testing.T) {
-	root, routes := scanRealRepo(t)
+	root, cfg, routes := scanRealRepo(t)
 
-	wantBytes, err := os.ReadFile(root + "/_routes.py")
+	wantBytes, err := os.ReadFile(root + "/_enigma.py")
 	if err != nil {
-		t.Fatalf("reading existing _routes.py (set ENIGMA_CLI_TEST_ROOT if camera_infra isn't a sibling): %v", err)
+		t.Fatalf("reading existing _enigma.py (set ENIGMA_CLI_TEST_ROOT if camera_infra isn't a sibling, or generate one first with `enigma-cli makeurls`): %v", err)
 	}
 
-	got := routegen.Render(routes, routegen.Eager)
+	got := routegen.Render(cfg, routes, routegen.Eager)
 
 	assertSameSet(t, "import", importLines(got), importLines(string(wantBytes)))
 	assertSameSet(t, "path(...)", pathLines(got), pathLines(string(wantBytes)))
@@ -45,12 +45,12 @@ func TestMakeURLsMatchesPythonOutput(t *testing.T) {
 // Lazy mode and confirms every module path routescan.Scan found appears
 // exactly once inside a _LazyAPIView(...) call — at full production scale
 // (~1000 routes), not just a small fixture. Lazy mode has no real-file
-// counterpart to diff against (the committed _routes.py is Eager-format),
+// counterpart to diff against (the committed _enigma.py is Eager-format),
 // so this is a self-consistency check instead.
 func TestLazyModeRoundTripsAllRealRoutes(t *testing.T) {
-	_, routes := scanRealRepo(t)
+	_, cfg, routes := scanRealRepo(t)
 
-	got := routegen.Render(routes, routegen.Lazy)
+	got := routegen.Render(cfg, routes, routegen.Lazy)
 
 	want := make([]string, 0, len(routes))
 	for _, r := range routes {
@@ -65,7 +65,7 @@ func TestLazyModeRoundTripsAllRealRoutes(t *testing.T) {
 	assertSameSet(t, "_LazyAPIView module path", gotModules, want)
 }
 
-func scanRealRepo(t *testing.T) (root string, routes []routescan.RouteEntry) {
+func scanRealRepo(t *testing.T) (root string, cfg *enigmaconfig.Config, routes []routescan.RouteEntry) {
 	t.Helper()
 
 	root = os.Getenv("ENIGMA_CLI_TEST_ROOT")
@@ -81,7 +81,7 @@ func scanRealRepo(t *testing.T) (root string, routes []routescan.RouteEntry) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	return root, routes
+	return root, cfg, routes
 }
 
 func importLines(content string) []string {

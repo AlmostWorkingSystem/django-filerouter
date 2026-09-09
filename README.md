@@ -15,10 +15,11 @@ Design doc and implementation plan live in the `camera_infra` repo under
 
 ## Status
 
-This is a standalone build, verified against the real `camera_infra`
-checkout (see Testing below), but **not yet wired into `camera_infra`**
-(justfile/Dockerfiles still call `./manage.py makeurls` / `./manage.py
-server`) and has **no CI/release workflow yet**. Both are the next steps.
+Verified against the real `camera_infra` checkout (see Testing below) and
+wired into its `Justfile`'s `dev` recipe on the
+`feature/enigma-cli-integration` branch there (binary currently built
+locally and `docker cp`'d into the dev container — Dockerfile/CI wiring is
+still a next step, along with a release workflow).
 
 ## Install / build
 
@@ -32,23 +33,41 @@ Requires Go 1.27+ (see `go.mod`).
 
 Both subcommands take `--root` (default `.`), the path to the Django
 project root — same convention as running `./manage.py <command>` from
-the repo root.
+the repo root. Both also take `--dev`, which switches the generated route
+format from **Eager** (default) to **Lazy**:
+
+- **Eager** (production): every route gets a static import (or, for a
+  `<type:name>`-shaped module path, a module-level resolve) at
+  `_enigma.py` import time. Every view module imports up front — slower
+  server boot, but nothing needs to resolve again per-request or for
+  schema generation.
+- **Lazy** (`--dev`, local iteration): every route delegates to a shared
+  `_LazyAPIView` class that defers importing its view module until either
+  a real request hits it or something (e.g. drf-spectacular's schema
+  generation) introspects `.cls`. Much faster server boot, at the cost of
+  a one-time import on first use per route instead of at startup.
 
 ```bash
-# One-shot: scan modules/, write _routes.py, print elapsed time.
-enigma-cli makeurls [--root path]
+# One-shot: scan modules/, write _enigma.py, print elapsed time.
+enigma-cli makeurls [--root path] [--dev]
 
 # Dev loop: run makeurls once, then supervise `./manage.py runsslserver <addr>`,
-# regenerating _routes.py and restarting it on relevant file changes.
-enigma-cli server [--root path] <addr>
+# regenerating _enigma.py and restarting it on relevant file changes.
+enigma-cli server [--root path] [--dev] <addr>
 ```
 
 `server`'s file-watching mirrors the Python `WatchDogReloader` it replaces:
-any `*.py`/`*.html`/`.env` file change (excluding `_routes.py` and
+any `*.py`/`*.html`/`.env` file change (excluding `_enigma.py` and
 `__pycache__`) restarts the supervised server; a narrower
 Create/Remove/Rename of a `.py` file under an `api/` directory additionally
-triggers an in-process regenerate of `_routes.py` first, and a newly
+triggers an in-process regenerate of `_enigma.py` first, and a newly
 created empty API file gets scaffolded with view boilerplate.
+
+`_enigma.py` unifies what the Python side used to split across `_routes.py`
+(`urlpatterns`) and `settings.ENIGMA_CONFIG`/`INSTALLED_APPS` (computed at
+Django-startup time by `kit/conf/parser.py`, re-parsing
+`enigma-config.yaml` and re-walking `modules/` on every process start) into
+one generated file Django just imports as plain data.
 
 ## Package layout
 
@@ -57,7 +76,7 @@ created empty API file gets scaffolded with view boilerplate.
 | `internal/enigmaconfig` | Parses `enigma-config.yaml` into an order-preserving `Config`, replicating the real parser's `core`-module defaulting |
 | `internal/pyscan` | Regex-based static scanning of Python source — `APIView` detection, `url_prefix`/`url_name` overrides, `apps.py` labels — never imports/executes Python |
 | `internal/routescan` | Walks the `modules/` filesystem tree into a flat route list (port of `Module._make_urls`) |
-| `internal/routegen` | Renders `_routes.py` from a route list, byte-compatible with the real Django-generated file |
+| `internal/routegen` | Renders `_enigma.py` (`urlpatterns`, `ENIGMA_CONFIG`, `INSTALLED_APPS`) in Eager or Lazy mode |
 | `internal/apitemplate` | Generates the view-file boilerplate scaffolded into a newly created, empty API file |
 | `internal/appgen` | Composes `enigmaconfig` → `routescan` → `routegen` into the `makeurls` pipeline |
 | `internal/watch` | fsnotify-based debounced file watcher |
@@ -72,7 +91,7 @@ go test ./...
 
 There's also a read-only integration test that runs the real pipeline
 against an actual `camera_infra` checkout and diffs the result against its
-existing, Python-generated `_routes.py`:
+existing, previously-generated `_enigma.py`:
 
 ```bash
 go test -tags integration ./internal/integration/...

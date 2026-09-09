@@ -14,8 +14,8 @@ func TestGenerate_WritesRoutesFile(t *testing.T) {
 		mode   routegen.Mode
 		golden string
 	}{
-		{name: "Eager", mode: routegen.Eager, golden: "testdata/repo/_routes.py.golden"},
-		{name: "Lazy", mode: routegen.Lazy, golden: "testdata/repo/_routes.py.lazy.golden"},
+		{name: "Eager", mode: routegen.Eager, golden: "testdata/repo/_enigma.py.golden"},
+		{name: "Lazy", mode: routegen.Lazy, golden: "testdata/repo/_enigma.py.lazy.golden"},
 	}
 
 	for _, tc := range cases {
@@ -27,16 +27,16 @@ func TestGenerate_WritesRoutesFile(t *testing.T) {
 				t.Fatalf("Generate: %v", err)
 			}
 
-			got, err := os.ReadFile(filepath.Join(root, "_routes.py"))
+			got, err := os.ReadFile(filepath.Join(root, "_enigma.py"))
 			if err != nil {
-				t.Fatalf("reading generated _routes.py: %v", err)
+				t.Fatalf("reading generated _enigma.py: %v", err)
 			}
 			want, err := os.ReadFile(tc.golden)
 			if err != nil {
 				t.Fatalf("reading golden file: %v", err)
 			}
 			if string(got) != string(want) {
-				t.Fatalf("generated _routes.py mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
+				t.Fatalf("generated _enigma.py mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
 			}
 		})
 	}
@@ -52,7 +52,7 @@ func copyDir(t *testing.T, src, dst string) {
 		if err != nil {
 			return err
 		}
-		if rel == "." || rel == "_routes.py.golden" || rel == "_routes.py.lazy.golden" {
+		if rel == "." || rel == "_enigma.py.golden" || rel == "_enigma.py.lazy.golden" {
 			return nil
 		}
 		target := filepath.Join(dst, rel)

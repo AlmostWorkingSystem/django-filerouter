@@ -28,6 +28,33 @@ class _LazyAPIView:
             return self.__dict__["cls"]
         raise AttributeError(name)
 
+
+class _ConfigModule:
+    __slots__ = ("name", "submodules")
+
+    def __init__(self, name, submodules):
+        self.name = name
+        self.submodules = submodules
+
+
+class _EnigmaConfig:
+    __slots__ = ("modules",)
+
+    def __init__(self, modules):
+        self.modules = modules
+
+INSTALLED_APPS = [
+    "modules.core",
+    "modules.demo",
+]
+
+ENIGMA_CONFIG = _EnigmaConfig(modules={
+    "core": _ConfigModule("core", submodules={
+    }),
+    "demo": _ConfigModule("demo", submodules={
+    }),
+})
+
 urlpatterns = [
     path('v1/demo/widget/', _LazyAPIView('modules.demo.api.v1.widget'), name="widget-list"),
 ]

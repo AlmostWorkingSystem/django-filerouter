@@ -11,8 +11,13 @@ import (
 )
 
 // Generate runs the full makeurls pipeline against root and writes
-// <root>/_routes.py in the given routegen.Mode, returning how long it took
+// <root>/_enigma.py in the given routegen.Mode, returning how long it took
 // (surfaced by the CLI, same as the Python command's own timing print).
+// _enigma.py unifies what used to be split across _routes.py (urlpatterns)
+// and settings.ENIGMA_CONFIG/INSTALLED_APPS (computed at Django-startup
+// time by kit/conf/parser.py) into one generated file, so Django's own
+// bootstrap can just import plain data instead of re-parsing
+// enigma-config.yaml and re-walking modules/ on every process start.
 func Generate(root string, mode routegen.Mode) (time.Duration, error) {
 	start := time.Now()
 
@@ -24,8 +29,8 @@ func Generate(root string, mode routegen.Mode) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
-	content := routegen.Render(routes, mode)
-	if err := os.WriteFile(filepath.Join(root, "_routes.py"), []byte(content), 0o644); err != nil {
+	content := routegen.Render(cfg, routes, mode)
+	if err := os.WriteFile(filepath.Join(root, "_enigma.py"), []byte(content), 0o644); err != nil {
 		return 0, err
 	}
 

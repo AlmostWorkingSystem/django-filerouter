@@ -18,8 +18,12 @@ type Event struct {
 
 // filter replicates WatchDogReloader's should_skip_event debounce plus its
 // PatternMatchingEventHandler pattern match (modules/core/management/commands/server.py:99-105):
-// patterns=["*.py", "*.html", ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"].
-// This is the single "does this event even get considered" gate — it
+// patterns=["*.py", "*.html", ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"] —
+// the real Python source's own ignore literal still says "_routes.py"
+// (that file is superseded, not edited), but the exclusion here targets
+// "_enigma.py" since that's what THIS tool generates and must never
+// self-trigger a restart loop over. This is the single "does this event
+// even get considered" gate — it
 // accepts ALL fsnotify ops (Create, Write, Remove, Rename), matching
 // Python's on_any_event being invoked for every non-ignored, non-debounced
 // event regardless of type. It does NOT decide whether to regenerate
@@ -37,13 +41,15 @@ func newFilter(debounce time.Duration) *filter {
 }
 
 // isQualifyingPath implements the PatternMatchingEventHandler patterns
-// Python's WatchDogReloader is constructed with: never _routes.py, never a
-// path under __pycache__, and a suffix of .py or .html, or the exact
-// basename ".env" (patterns=["*.py", "*.html", ".env"],
-// ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"]).
+// Python's WatchDogReloader is constructed with (patterns=["*.py", "*.html",
+// ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"]),
+// substituting this tool's own generated file (_enigma.py) for the
+// Python original's _routes.py exclusion: never _enigma.py, never a path
+// under __pycache__, and a suffix of .py or .html, or the exact basename
+// ".env".
 func isQualifyingPath(name string) bool {
 	base := filepath.Base(name)
-	if base == "_routes.py" {
+	if base == "_enigma.py" {
 		return false
 	}
 	for _, part := range strings.Split(filepath.ToSlash(name), "/") {
@@ -92,7 +98,7 @@ func IsAPIFileChange(ev Event) bool {
 
 // Watch recursively watches root and calls onQualifying for every
 // debounced filesystem event matching the *.py/*.html/.env patterns
-// (excluding _routes.py and __pycache__), regardless of op type. Use
+// (excluding _enigma.py and __pycache__), regardless of op type. Use
 // IsAPIFileChange on the resulting Event to decide whether it also
 // warrants a makeurls regeneration.
 // It returns a stop function to tear the watcher down.
