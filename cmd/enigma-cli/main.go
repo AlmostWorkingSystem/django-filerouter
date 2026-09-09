@@ -12,6 +12,7 @@ import (
 
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/apitemplate"
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/appgen"
+	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/supervisor"
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/watch"
 )
@@ -35,15 +36,32 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: enigma-cli <makeurls|server> [--root path] [addr]")
+	fmt.Fprintln(os.Stderr, "usage: enigma-cli <makeurls|server> [--root path] [--dev] [addr]")
+}
+
+// resolveMode returns Eager unless --dev is set. Eager is the production
+// format: every route resolves (and every view module imports) once, at
+// _routes.py import time, so nothing needs to happen again per-request or
+// for schema generation — favors fast, consistent request serving over
+// server boot time. --dev switches to Lazy, which defers each route's
+// view-module import until it's actually needed (a real request, or schema
+// introspection) — much faster server boot, at the cost of a one-time
+// per-route import on first use instead of at startup. Use --dev for local
+// iteration, leave it off in production.
+func resolveMode(dev bool) routegen.Mode {
+	if dev {
+		return routegen.Lazy
+	}
+	return routegen.Eager
 }
 
 func runMakeURLs(args []string) {
 	fs := flag.NewFlagSet("makeurls", flag.ExitOnError)
 	root := fs.String("root", ".", "path to the Django project root")
+	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
 	fs.Parse(args)
 
-	elapsed, err := appgen.Generate(*root)
+	elapsed, err := appgen.Generate(*root, resolveMode(*dev))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -54,14 +72,16 @@ func runMakeURLs(args []string) {
 func runServer(args []string) {
 	fs := flag.NewFlagSet("server", flag.ExitOnError)
 	root := fs.String("root", ".", "path to the Django project root")
+	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
 	fs.Parse(args)
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] <addr>")
+		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] [--dev] <addr>")
 		os.Exit(1)
 	}
 	addr := fs.Arg(0)
+	mode := resolveMode(*dev)
 
-	elapsed, err := appgen.Generate(*root)
+	elapsed, err := appgen.Generate(*root, mode)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "initial makeurls failed:", err)
 		os.Exit(1)
@@ -85,7 +105,7 @@ func runServer(args []string) {
 				maybeScaffold(ev.Path)
 			}
 			fmt.Println("Regenerating URLs due to file change:", ev.Path)
-			if _, err := appgen.Generate(*root); err != nil {
+			if _, err := appgen.Generate(*root, mode); err != nil {
 				fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _routes.py:", err)
 			}
 		} else {

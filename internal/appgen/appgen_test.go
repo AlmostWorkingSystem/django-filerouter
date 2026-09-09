@@ -4,26 +4,41 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
 )
 
 func TestGenerate_WritesRoutesFile(t *testing.T) {
-	root := t.TempDir()
-	copyDir(t, "testdata/repo", root)
-
-	if _, err := Generate(root); err != nil {
-		t.Fatalf("Generate: %v", err)
+	cases := []struct {
+		name   string
+		mode   routegen.Mode
+		golden string
+	}{
+		{name: "Eager", mode: routegen.Eager, golden: "testdata/repo/_routes.py.golden"},
+		{name: "Lazy", mode: routegen.Lazy, golden: "testdata/repo/_routes.py.lazy.golden"},
 	}
 
-	got, err := os.ReadFile(filepath.Join(root, "_routes.py"))
-	if err != nil {
-		t.Fatalf("reading generated _routes.py: %v", err)
-	}
-	want, err := os.ReadFile("testdata/repo/_routes.py.golden")
-	if err != nil {
-		t.Fatalf("reading golden file: %v", err)
-	}
-	if string(got) != string(want) {
-		t.Fatalf("generated _routes.py mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			copyDir(t, "testdata/repo", root)
+
+			if _, err := Generate(root, tc.mode); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			got, err := os.ReadFile(filepath.Join(root, "_routes.py"))
+			if err != nil {
+				t.Fatalf("reading generated _routes.py: %v", err)
+			}
+			want, err := os.ReadFile(tc.golden)
+			if err != nil {
+				t.Fatalf("reading golden file: %v", err)
+			}
+			if string(got) != string(want) {
+				t.Fatalf("generated _routes.py mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
+			}
+		})
 	}
 }
 
@@ -37,7 +52,7 @@ func copyDir(t *testing.T, src, dst string) {
 		if err != nil {
 			return err
 		}
-		if rel == "." || rel == "_routes.py.golden" {
+		if rel == "." || rel == "_routes.py.golden" || rel == "_routes.py.lazy.golden" {
 			return nil
 		}
 		target := filepath.Join(dst, rel)
