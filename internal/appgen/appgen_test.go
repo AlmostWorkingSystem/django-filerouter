@@ -8,14 +8,14 @@ import (
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
 )
 
-func TestGenerate_WritesRoutesFile(t *testing.T) {
+func TestGenerate_WritesConfigAndRoutesFiles(t *testing.T) {
 	cases := []struct {
-		name   string
-		mode   routegen.Mode
-		golden string
+		name         string
+		mode         routegen.Mode
+		routesGolden string
 	}{
-		{name: "Eager", mode: routegen.Eager, golden: "testdata/repo/_enigma.py.golden"},
-		{name: "Lazy", mode: routegen.Lazy, golden: "testdata/repo/_enigma.py.lazy.golden"},
+		{name: "Eager", mode: routegen.Eager, routesGolden: "testdata/repo/_routes.py.golden"},
+		{name: "Lazy", mode: routegen.Lazy, routesGolden: "testdata/repo/_routes.py.lazy.golden"},
 	}
 
 	for _, tc := range cases {
@@ -27,18 +27,25 @@ func TestGenerate_WritesRoutesFile(t *testing.T) {
 				t.Fatalf("Generate: %v", err)
 			}
 
-			got, err := os.ReadFile(filepath.Join(root, "_enigma.py"))
-			if err != nil {
-				t.Fatalf("reading generated _enigma.py: %v", err)
-			}
-			want, err := os.ReadFile(tc.golden)
-			if err != nil {
-				t.Fatalf("reading golden file: %v", err)
-			}
-			if string(got) != string(want) {
-				t.Fatalf("generated _enigma.py mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
-			}
+			assertFileMatches(t, filepath.Join(root, "_enigma.py"), "testdata/repo/_enigma.py.golden")
+			assertFileMatches(t, filepath.Join(root, "_routes.py"), tc.routesGolden)
 		})
+	}
+}
+
+func assertFileMatches(t *testing.T, gotPath, wantPath string) {
+	t.Helper()
+
+	got, err := os.ReadFile(gotPath)
+	if err != nil {
+		t.Fatalf("reading generated %s: %v", gotPath, err)
+	}
+	want, err := os.ReadFile(wantPath)
+	if err != nil {
+		t.Fatalf("reading golden file %s: %v", wantPath, err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("%s mismatch.\n--- got ---\n%s\n--- want ---\n%s", gotPath, got, want)
 	}
 }
 
@@ -52,7 +59,7 @@ func copyDir(t *testing.T, src, dst string) {
 		if err != nil {
 			return err
 		}
-		if rel == "." || rel == "_enigma.py.golden" || rel == "_enigma.py.lazy.golden" {
+		if rel == "." || rel == "_enigma.py.golden" || rel == "_routes.py.golden" || rel == "_routes.py.lazy.golden" {
 			return nil
 		}
 		target := filepath.Join(dst, rel)

@@ -41,7 +41,7 @@ func usage() {
 
 // resolveMode returns Eager unless --dev is set. Eager is the production
 // format: every route resolves (and every view module imports) once, at
-// _enigma.py import time, so nothing needs to happen again per-request or
+// _routes.py import time, so nothing needs to happen again per-request or
 // for schema generation — favors fast, consistent request serving over
 // server boot time. --dev switches to Lazy, which defers each route's
 // view-module import until it's actually needed (a real request, or schema
@@ -106,7 +106,7 @@ func runServer(args []string) {
 			}
 			fmt.Println("Regenerating URLs due to file change:", ev.Path)
 			if _, err := appgen.Generate(*root, mode); err != nil {
-				fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _enigma.py:", err)
+				fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _enigma.py/_routes.py:", err)
 			}
 		} else {
 			fmt.Println("Restarting server due to file change:", ev.Path)

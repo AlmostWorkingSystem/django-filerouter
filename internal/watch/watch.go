@@ -21,9 +21,10 @@ type Event struct {
 // patterns=["*.py", "*.html", ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"] —
 // the real Python source's own ignore literal still says "_routes.py"
 // (that file is superseded, not edited), but the exclusion here targets
-// "_enigma.py" since that's what THIS tool generates and must never
-// self-trigger a restart loop over. This is the single "does this event
-// even get considered" gate — it
+// both "_enigma.py" and "_routes.py" (this tool's own two generated
+// files — see routegen.RenderConfig/RenderRoutes) since either being
+// rewritten by a regenerate must never itself trigger another restart
+// loop. This is the single "does this event even get considered" gate — it
 // accepts ALL fsnotify ops (Create, Write, Remove, Rename), matching
 // Python's on_any_event being invoked for every non-ignored, non-debounced
 // event regardless of type. It does NOT decide whether to regenerate
@@ -43,13 +44,13 @@ func newFilter(debounce time.Duration) *filter {
 // isQualifyingPath implements the PatternMatchingEventHandler patterns
 // Python's WatchDogReloader is constructed with (patterns=["*.py", "*.html",
 // ".env"], ignore_patterns=["*.pyc", "__pycache__/*", "_routes.py"]),
-// substituting this tool's own generated file (_enigma.py) for the
-// Python original's _routes.py exclusion: never _enigma.py, never a path
-// under __pycache__, and a suffix of .py or .html, or the exact basename
-// ".env".
+// substituting this tool's own two generated files (_enigma.py,
+// _routes.py) for the Python original's single _routes.py exclusion:
+// never either of those, never a path under __pycache__, and a suffix of
+// .py or .html, or the exact basename ".env".
 func isQualifyingPath(name string) bool {
 	base := filepath.Base(name)
-	if base == "_enigma.py" {
+	if base == "_enigma.py" || base == "_routes.py" {
 		return false
 	}
 	for _, part := range strings.Split(filepath.ToSlash(name), "/") {

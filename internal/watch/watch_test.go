@@ -35,6 +35,13 @@ func TestShouldTrigger_IgnoresEnigmaFile(t *testing.T) {
 	}
 }
 
+func TestShouldTrigger_IgnoresRoutesFile(t *testing.T) {
+	f := newFilter(500 * time.Millisecond)
+	if f.shouldTrigger(fsnotify.Event{Name: "_routes.py", Op: fsnotify.Create}) {
+		t.Fatalf("_routes.py must never trigger (would self-loop)")
+	}
+}
+
 func TestShouldTrigger_IgnoresNonPyFiles(t *testing.T) {
 	f := newFilter(500 * time.Millisecond)
 	if f.shouldTrigger(fsnotify.Event{Name: "modules/demo/api/v1/notes.txt", Op: fsnotify.Create}) {

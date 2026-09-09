@@ -14,12 +14,12 @@ import (
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/routescan"
 )
 
-// TestMakeURLsMatchesPythonOutput compares enigma-cli's Eager-mode output
-// against the real camera_infra checkout's existing, previously-generated
-// _enigma.py (Eager mode's import/path lines are still byte-compatible in
-// shape with what the original Config.save_urls produced for _routes.py —
-// see the design spec — so this keeps the original line-set comparison).
-// It never writes anything — pure read + diff.
+// TestMakeURLsMatchesPythonOutput compares enigma-cli's Eager-mode
+// RenderRoutes output against the real camera_infra checkout's existing,
+// previously-generated _routes.py (Eager mode's import/path lines are
+// still byte-compatible in shape with what the original Config.save_urls
+// produced — see the design spec — so this keeps the original line-set
+// comparison). It never writes anything — pure read + diff.
 //
 // Route/import order *within* a given api version must match exactly (it's
 // fully determined by the yaml and the filesystem tree). The outer
@@ -28,14 +28,14 @@ import (
 // listing order with no defined contract — see the design doc's Testing
 // section. So this test compares import lines and path(...) lines as sets.
 func TestMakeURLsMatchesPythonOutput(t *testing.T) {
-	root, cfg, routes := scanRealRepo(t)
+	root, _, routes := scanRealRepo(t)
 
-	wantBytes, err := os.ReadFile(root + "/_enigma.py")
+	wantBytes, err := os.ReadFile(root + "/_routes.py")
 	if err != nil {
-		t.Fatalf("reading existing _enigma.py (set ENIGMA_CLI_TEST_ROOT if camera_infra isn't a sibling, or generate one first with `enigma-cli makeurls`): %v", err)
+		t.Fatalf("reading existing _routes.py (set ENIGMA_CLI_TEST_ROOT if camera_infra isn't a sibling, or generate one first with `enigma-cli makeurls`): %v", err)
 	}
 
-	got := routegen.Render(cfg, routes, routegen.Eager)
+	got := routegen.RenderRoutes(routes, routegen.Eager)
 
 	assertSameSet(t, "import", importLines(got), importLines(string(wantBytes)))
 	assertSameSet(t, "path(...)", pathLines(got), pathLines(string(wantBytes)))
@@ -45,12 +45,12 @@ func TestMakeURLsMatchesPythonOutput(t *testing.T) {
 // Lazy mode and confirms every module path routescan.Scan found appears
 // exactly once inside a _LazyAPIView(...) call — at full production scale
 // (~1000 routes), not just a small fixture. Lazy mode has no real-file
-// counterpart to diff against (the committed _enigma.py is Eager-format),
+// counterpart to diff against (the committed _routes.py is Eager-format),
 // so this is a self-consistency check instead.
 func TestLazyModeRoundTripsAllRealRoutes(t *testing.T) {
-	_, cfg, routes := scanRealRepo(t)
+	_, _, routes := scanRealRepo(t)
 
-	got := routegen.Render(cfg, routes, routegen.Lazy)
+	got := routegen.RenderRoutes(routes, routegen.Lazy)
 
 	want := make([]string, 0, len(routes))
 	for _, r := range routes {
@@ -63,6 +63,41 @@ func TestLazyModeRoundTripsAllRealRoutes(t *testing.T) {
 	}
 
 	assertSameSet(t, "_LazyAPIView module path", gotModules, want)
+}
+
+// TestRenderConfigNeverImportsDjangoAtRealScale confirms RenderConfig's
+// "zero Django imports" invariant holds against the real ~30-module
+// enigma-config.yaml, not just a small fixture, and that every module the
+// real config declares round-trips into INSTALLED_APPS.
+func TestRenderConfigNeverImportsDjangoAtRealScale(t *testing.T) {
+	_, cfg, _ := scanRealRepo(t)
+
+	got := routegen.RenderConfig(cfg)
+
+	for _, line := range strings.Split(got, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "from django") || strings.HasPrefix(trimmed, "import django") {
+			t.Fatalf("_enigma.py must never import Django: %q", trimmed)
+		}
+	}
+
+	var wantApps []string
+	for _, me := range cfg.Modules {
+		if me.Module.Settings.Standalone {
+			wantApps = append(wantApps, "modules."+me.Name)
+			continue
+		}
+		for _, se := range me.Module.Submodules {
+			wantApps = append(wantApps, "modules."+me.Name+"."+se.Name)
+		}
+	}
+
+	var gotApps []string
+	for _, m := range installedAppRe.FindAllStringSubmatch(got, -1) {
+		gotApps = append(gotApps, m[1])
+	}
+
+	assertSameSet(t, "INSTALLED_APPS entry", gotApps, wantApps)
 }
 
 func scanRealRepo(t *testing.T) (root string, cfg *enigmaconfig.Config, routes []routescan.RouteEntry) {
@@ -106,6 +141,7 @@ func pathLines(content string) []string {
 }
 
 var lazyAPIViewModuleRe = regexp.MustCompile(`_LazyAPIView\('([^']*)'\)`)
+var installedAppRe = regexp.MustCompile(`(?m)^\s+"([^"]*)",$`)
 
 func assertSameSet(t *testing.T, label string, got, want []string) {
 	t.Helper()
