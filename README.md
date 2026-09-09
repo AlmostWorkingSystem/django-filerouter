@@ -53,8 +53,14 @@ enigma-cli makeurls [--root path] [--dev]
 
 # Dev loop: run makeurls once, then supervise `./manage.py runsslserver <addr>`,
 # regenerating both files and restarting it on relevant file changes.
-enigma-cli server [--root path] [--dev] <addr>
+enigma-cli server [--root path] [--dev] [--skip-checks] <addr>
 ```
+
+`server` always passes `--noreload` to the supervised `runsslserver` —
+enigma-cli's own watcher already restarts it on file changes, so Django's
+built-in reloader would otherwise redundantly re-exec the process a second
+time on every start (measured: roughly doubles time-to-ready). `--skip-checks`
+is forwarded through as-is, skipping Django's system-check pass.
 
 `server`'s file-watching mirrors the Python `WatchDogReloader` it replaces:
 any `*.py`/`*.html`/`.env` file change (excluding `_enigma.py`, `_routes.py`,
