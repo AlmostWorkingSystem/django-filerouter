@@ -73,9 +73,10 @@ func runServer(args []string) {
 	fs := flag.NewFlagSet("server", flag.ExitOnError)
 	root := fs.String("root", ".", "path to the Django project root")
 	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
+	skipChecks := fs.Bool("skip-checks", false, "pass --skip-checks through to the supervised runsslserver, skipping Django's system checks")
 	fs.Parse(args)
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] [--dev] <addr>")
+		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] [--dev] [--skip-checks] <addr>")
 		os.Exit(1)
 	}
 	addr := fs.Arg(0)
@@ -88,7 +89,17 @@ func runServer(args []string) {
 	}
 	fmt.Printf("URL generation completed in %s.\n", elapsed)
 
-	sup := supervisor.New(*root, "./manage.py", "runsslserver", addr)
+	// --noreload: enigma-cli's own watch+supervisor already restarts the
+	// child on file changes, exactly what the real server.py did too
+	// (setting use_reloader=False on its own re-exec'd child) — Django's
+	// built-in StatReloader would otherwise re-exec the process a second
+	// time for no reason, roughly doubling startup cost.
+	serverArgs := []string{"runsslserver", "--noreload"}
+	if *skipChecks {
+		serverArgs = append(serverArgs, "--skip-checks")
+	}
+	serverArgs = append(serverArgs, addr)
+	sup := supervisor.New(*root, "./manage.py", serverArgs...)
 	if err := sup.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, "starting runsslserver failed:", err)
 		os.Exit(1)
