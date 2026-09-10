@@ -1,36 +1,75 @@
 # enigma-cli
 
-**A fast, dependency-free replacement for Django's `makeurls`/dev-server
-commands — written in Go so it never has to load Python to answer
-questions about your Python code.**
+**File-based routing for Django — create a file, get a route.**
 
-## The problem
+## The idea
 
-If you generate your Django `urlpatterns` dynamically (scanning a
-`modules/<app>/api/<version>/` tree for view files, say), the usual way to
-check "does this file define a view?" is to `import_module()` it and see.
-That means every route-discovery pass pays the cost of importing every
-candidate file — models, serializers, middleware, the works — even for
-files you don't end up routing to. Do that on every dev-server reload, and
-your edit-save-see-it loop gets slow.
+Frontend frameworks settled this years ago: Next.js, Nuxt, SvelteKit,
+Remix — your file layout *is* your routing table. Drop a file in the right
+folder and the route exists. No central registry to hand-maintain, no
+merge conflicts over who edited the routes file last, no risk of a route
+existing in code but never actually being wired up.
 
-## The fix
+enigma-cli brings that same convention to Django. You lay out view files
+under a predictable folder structure; enigma-cli scans it and generates
+the `urlpatterns` (and the small amount of settings wiring around it)
+Django actually needs — as a standalone CLI, not a Django management
+command.
 
-enigma-cli answers "does this file define an `APIView` class?" with a
-regex over the raw source instead of an import. No Python interpreter, no
-import graph, no Django — just reading files off disk. That's the whole
-trick, and it's what makes everything else here possible:
+## The structure it expects
+
+```
+your-project/
+├── enigma-config.yaml
+└── modules/
+    └── <module>/
+        ├── apps.py                # optional: label = "..."
+        ├── api/<version>/         # standalone module: api/ lives here
+        │   └── ....py             # each defines `class APIView`
+        └── <submodule>/           # OR: non-standalone module has submodules
+            ├── apps.py
+            └── api/<version>/...
+```
+
+- **`enigma-config.yaml`** declares each top-level module: whether it's
+  `standalone` (its `api/` sits directly under the module) or has named
+  submodules (each with their own `api/`), and which API versions it
+  serves.
+- **`apps.py`** may set `label = "..."`, used as the module's URL prefix.
+  If absent, it falls back to the last dotted segment of that file's
+  `name = "modules.x.y"` — Django's own `AppConfig.label` default.
+- **Any file under `api/<version>/`** that defines `class APIView` becomes
+  a route, named after its path in the tree — no manual registration.
+  `_`-prefixed files/directories (except `__init__.py`) are skipped. A
+  file or directory literally named `<type:name>` (e.g. `<str:identifier>`)
+  becomes a dynamic URL segment. A module-level `url_prefix`/`url_name`
+  overrides the default.
+
+If your project doesn't look like this, the convention isn't a fit yet —
+this isn't a general-purpose Django URL scanner, it's one opinionated
+shape.
+
+## Why a CLI instead of a Django management command
+
+Discovering "does this file define a view?" the usual way means
+`import_module()`-ing every candidate file — there's no way to ask that
+question without either parsing the source or actually running it, and
+running it pays your whole app's import graph (models, serializers,
+middleware) for files you might not even route to. enigma-cli answers it
+with a regex over the raw source instead: no Python interpreter, no import
+graph, just files on disk. That's what makes it cheap enough to re-run on
+every save during local dev, and fast enough that a CI/build step barely
+notices it.
+
+It also means two more things fall out naturally:
 
 - **Two speeds, your choice.** `--dev` switches the generated routes from
   **Eager** (every view resolved once, at import time — what production
   wants) to **Lazy** (each view resolved on first request — what a fast
   local reload loop wants).
-- **The output has no runtime dependency on this tool.** Once the files are
-  generated, Django only ever imports plain Python. enigma-cli only needs
-  to exist at generation time.
-- **One watcher, not two.** `enigma-cli server` supervises your dev server
-  directly, so Django's own autoreloader gets disabled instead of racing
-  it.
+- **Zero runtime dependency.** Once the files are generated, Django only
+  ever imports plain Python — enigma-cli only has to exist at generation
+  time, never while your app is actually serving requests.
 
 ## Install
 
@@ -60,40 +99,8 @@ enigma-cli makeurls
 enigma-cli server --dev 0:8000
 ```
 
-Then wire the two generated files into your settings and URLconf — see
-[Integrating with your project](#integrating-with-your-project) below.
-
-## Does your project fit?
-
-enigma-cli expects a Django project shaped like this:
-
-```
-your-project/
-├── enigma-config.yaml
-└── modules/
-    └── <module>/
-        ├── apps.py                # optional: label = "..."
-        ├── api/<version>/         # standalone module: api/ lives here
-        │   └── ....py             # each defines `class APIView`
-        └── <submodule>/           # OR: non-standalone module has submodules
-            ├── apps.py
-            └── api/<version>/...
-```
-
-- `enigma-config.yaml` declares each top-level module, whether it's
-  `standalone` or has named submodules, and which API versions it serves.
-- A module/submodule's `apps.py` may set `label = "..."`, used as its URL
-  prefix. If absent, the label falls back to the last dotted segment of
-  that file's `name = "modules.x.y"` (matching Django's own
-  `AppConfig.label` default).
-- Any file under `api/<version>/` defining `class APIView` becomes a
-  route. `_`-prefixed files/directories (except `__init__.py`) are
-  skipped. A directory/file literally named `<type:name>` (e.g.
-  `<str:identifier>`) becomes a dynamic URL segment. A module-level
-  `url_prefix`/`url_name` in a view file overrides the default
-  segment/name.
-
-If that's not your project's shape, this tool isn't a fit yet.
+Then wire the two generated files in — see
+[Integrating with your project](#integrating-with-your-project).
 
 ## CLI reference
 
