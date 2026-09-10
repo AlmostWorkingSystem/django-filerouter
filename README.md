@@ -74,6 +74,10 @@ enigma-cli makeurls [--root path] [--dev]
 # Dev loop: run makeurls once, then supervise `./manage.py runsslserver <addr>`,
 # regenerating both files and restarting it on relevant file changes.
 enigma-cli server [--root path] [--dev] [--skip-checks] <addr>
+
+# Print the version this binary was built at (a released binary reports its
+# tag, e.g. "enigma-cli v0.1.0"; a local `go build` reports "enigma-cli dev").
+enigma-cli version   # or --version / -v
 ```
 
 `server` always passes `--noreload` to the supervised `runsslserver` —

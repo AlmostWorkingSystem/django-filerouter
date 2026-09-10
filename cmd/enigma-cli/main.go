@@ -17,6 +17,11 @@ import (
 	"github.com/AlmostWorkingSystem/enigma-cli/internal/watch"
 )
 
+// version is set at build time via -ldflags "-X main.version=..." (see
+// .goreleaser.yaml, which injects the git tag). Left as "dev" for local
+// `go build`/`go run` so it's obvious a binary wasn't built by a release.
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -28,6 +33,8 @@ func main() {
 		runMakeURLs(os.Args[2:])
 	case "server":
 		runServer(os.Args[2:])
+	case "version", "--version", "-v":
+		fmt.Println("enigma-cli", version)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		usage()
@@ -36,7 +43,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: enigma-cli <makeurls|server> [--root path] [--dev] [addr]")
+	fmt.Fprintln(os.Stderr, "usage: enigma-cli <makeurls|server|version> [--root path] [--dev] [addr]")
 }
 
 // resolveMode returns Eager unless --dev is set. Eager is the production
