@@ -108,7 +108,7 @@ func scanRealRepo(t *testing.T) (root string, cfg *enigmaconfig.Config, routes [
 		root = "../../../camera_infra"
 	}
 
-	cfg, err := enigmaconfig.Load(root)
+	cfg, err := enigmaconfig.Load(root, "")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

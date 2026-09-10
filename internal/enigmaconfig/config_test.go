@@ -3,7 +3,7 @@ package enigmaconfig
 import "testing"
 
 func TestLoad_PreservesDeclarationOrderAndAppliesCoreDefaults(t *testing.T) {
-	cfg, err := Load("testdata")
+	cfg, err := Load("testdata", "")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

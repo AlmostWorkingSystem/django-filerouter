@@ -37,10 +37,17 @@ type Config struct {
 	Modules []ModuleEntry
 }
 
-// Load reads <root>/enigma-config.yaml, matching how the Python
-// ConfigParser always resolves it relative to the Django project root.
-func Load(root string) (*Config, error) {
-	return loadFile(filepath.Join(root, "enigma-config.yaml"))
+// DefaultFileName is the config file name the Python ConfigParser always
+// resolves relative to the Django project root.
+const DefaultFileName = "enigma-config.yaml"
+
+// Load reads <root>/<fileName>. An empty fileName falls back to
+// DefaultFileName.
+func Load(root, fileName string) (*Config, error) {
+	if fileName == "" {
+		fileName = DefaultFileName
+	}
+	return loadFile(filepath.Join(root, fileName))
 }
 
 func loadFile(path string) (*Config, error) {

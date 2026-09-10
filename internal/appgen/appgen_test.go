@@ -23,7 +23,7 @@ func TestGenerate_WritesConfigAndRoutesFiles(t *testing.T) {
 			root := t.TempDir()
 			copyDir(t, "testdata/repo", root)
 
-			if _, err := Generate(root, tc.mode); err != nil {
+			if _, err := Generate(root, tc.mode, ""); err != nil {
 				t.Fatalf("Generate: %v", err)
 			}
 

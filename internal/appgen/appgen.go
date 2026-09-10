@@ -28,10 +28,10 @@ import (
 // These two are deliberately separate files, not one: see
 // routegen.RenderConfig's doc comment for why merging them crashes with
 // AppRegistryNotReady.
-func Generate(root string, mode routegen.Mode) (time.Duration, error) {
+func Generate(root string, mode routegen.Mode, configFile string) (time.Duration, error) {
 	start := time.Now()
 
-	cfg, err := enigmaconfig.Load(root)
+	cfg, err := enigmaconfig.Load(root, configFile)
 	if err != nil {
 		return 0, err
 	}

@@ -40,7 +40,8 @@ your-project/
 - **`enigma-config.yaml`** declares each top-level module: whether it's
   `standalone` (its `api/` sits directly under the module) or has named
   submodules (each with their own `api/`), and which API versions it
-  serves.
+  serves. Pass `--config <name>` to `makeurls`/`server` if you'd rather
+  name this file something else.
 - **`apps.py`** may set `label = "..."`, used as the module's URL prefix.
   If absent, it falls back to the last dotted segment of that file's
   `name = "modules.x.y"` — Django's own `AppConfig.label` default.
@@ -110,11 +111,12 @@ Then wire the two generated files in — see
 
 ## CLI reference
 
-Both subcommands take `--root` (default `.`).
+Both subcommands take `--root` (default `.`) and `--config` (default
+`enigma-config.yaml`).
 
 ```bash
-django-filerouter makeurls [--root path] [--dev]
-django-filerouter server [--root path] [--dev] [--skip-checks] <addr>
+django-filerouter makeurls [--root path] [--dev] [--config name]
+django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] <addr>
 django-filerouter version   # or --version / -v
 ```
 
@@ -123,6 +125,7 @@ django-filerouter version   # or --version / -v
 | `--dev` | Generate Lazy-mode routes (fast boot, per-route import on first use) instead of the Eager default (import-time resolution) |
 | `--skip-checks` | Forwarded to the supervised `runsslserver`, skipping Django's system-check pass |
 | `--root` | Path to the Django project root (default `.`) |
+| `--config` | Name of the config file to read, relative to `--root` (default `enigma-config.yaml`) |
 
 ### Why `runsslserver`, not `runserver`
 

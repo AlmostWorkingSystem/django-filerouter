@@ -12,6 +12,7 @@ import (
 
 	"github.com/AlmostWorkingSystem/django-filerouter/internal/apitemplate"
 	"github.com/AlmostWorkingSystem/django-filerouter/internal/appgen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
 	"github.com/AlmostWorkingSystem/django-filerouter/internal/routegen"
 	"github.com/AlmostWorkingSystem/django-filerouter/internal/supervisor"
 	"github.com/AlmostWorkingSystem/django-filerouter/internal/watch"
@@ -43,7 +44,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: django-filerouter <makeurls|server|version> [--root path] [--dev] [addr]")
+	fmt.Fprintln(os.Stderr, "usage: django-filerouter <makeurls|server|version> [--root path] [--dev] [--config name] [addr]")
 }
 
 // resolveMode returns Eager unless --dev is set. Eager is the production
@@ -66,9 +67,10 @@ func runMakeURLs(args []string) {
 	fs := flag.NewFlagSet("makeurls", flag.ExitOnError)
 	root := fs.String("root", ".", "path to the Django project root")
 	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
+	config := fs.String("config", enigmaconfig.DefaultFileName, "name of the config file to read, relative to --root")
 	fs.Parse(args)
 
-	elapsed, err := appgen.Generate(*root, resolveMode(*dev))
+	elapsed, err := appgen.Generate(*root, resolveMode(*dev), *config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -81,15 +83,16 @@ func runServer(args []string) {
 	root := fs.String("root", ".", "path to the Django project root")
 	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
 	skipChecks := fs.Bool("skip-checks", false, "pass --skip-checks through to the supervised runsslserver, skipping Django's system checks")
+	config := fs.String("config", enigmaconfig.DefaultFileName, "name of the config file to read, relative to --root")
 	fs.Parse(args)
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: django-filerouter server [--root path] [--dev] [--skip-checks] <addr>")
+		fmt.Fprintln(os.Stderr, "usage: django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] <addr>")
 		os.Exit(1)
 	}
 	addr := fs.Arg(0)
 	mode := resolveMode(*dev)
 
-	elapsed, err := appgen.Generate(*root, mode)
+	elapsed, err := appgen.Generate(*root, mode, *config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "initial makeurls failed:", err)
 		os.Exit(1)
@@ -123,7 +126,7 @@ func runServer(args []string) {
 				maybeScaffold(ev.Path)
 			}
 			fmt.Println("Regenerating URLs due to file change:", ev.Path)
-			if _, err := appgen.Generate(*root, mode); err != nil {
+			if _, err := appgen.Generate(*root, mode, *config); err != nil {
 				fmt.Fprintln(os.Stderr, "makeurls failed, keeping old _enigma.py/_routes.py:", err)
 			}
 		} else {
