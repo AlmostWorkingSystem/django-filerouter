@@ -1,3 +1,4 @@
 /enigma-cli
 /bin/
+/dist/
 *.log

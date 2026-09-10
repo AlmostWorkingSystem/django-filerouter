@@ -18,8 +18,28 @@ Design doc and implementation plan live in the `camera_infra` repo under
 Verified against the real `camera_infra` checkout (see Testing below) and
 wired into its `Justfile`'s `dev` recipe on the
 `feature/enigma-cli-integration` branch there (binary currently built
-locally and `docker cp`'d into the dev container — Dockerfile/CI wiring is
-still a next step, along with a release workflow).
+locally and `docker cp`'d into the dev container — Dockerfile/CI wiring to
+fetch a released binary automatically is still a next step).
+
+## Releases
+
+Releases are cut from `main` via git tags, built by
+[GoReleaser](https://goreleaser.com) (`.goreleaser.yaml`) through
+`.github/workflows/release.yml`. Pushing a tag matching `v*` builds
+binaries for `linux/amd64`, `linux/arm64`, and `darwin/arm64` and attaches
+them to a GitHub Release — no branch push ever triggers a release, only a
+tag push does.
+
+To cut one:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Version numbers follow [SemVer](https://semver.org):
+`vMAJOR.MINOR.PATCH` — patch for fixes, minor for new features, major for
+breaking changes.
 
 ## Install / build
 
