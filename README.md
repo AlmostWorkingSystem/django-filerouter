@@ -2,6 +2,12 @@
 
 **File-based routing for Django — create a file, get a route.**
 
+Fed up of writing a view, then flipping over to `urls.py` to wire it up,
+then forgetting you did and wondering ten minutes later why your new
+endpoint 404s? Or a merge conflict on `urls.py` because two people added a
+route in the same spot the same day? That's the entire class of problem
+this tool exists to delete.
+
 ## The idea
 
 Frontend frameworks settled this years ago: Next.js, Nuxt, SvelteKit,
@@ -118,13 +124,35 @@ enigma-cli version   # or --version / -v
 | `--skip-checks` | Forwarded to the supervised `runsslserver`, skipping Django's system-check pass |
 | `--root` | Path to the Django project root (default `.`) |
 
-`server` also passes `--noreload` to the supervised `runsslserver` — its
-own watcher already handles restarts, so Django's built-in reloader is
-redundant. Its file-watching: any `*.py`/`*.html`/`.env` change (excluding
-the two generated files and anything under `__pycache__`) restarts the
-server; a narrower Create/Remove/Rename of a `.py` file under an `api/`
-directory also regenerates the routes first. A newly created, empty API
-file gets scaffolded with view boilerplate.
+### Why `runsslserver`, not `runserver`
+
+`server` supervises
+[`runsslserver`](https://pypi.org/project/django-sslserver-v2/), not
+Django's plain `runserver` — a lot of things browsers only allow over
+HTTPS (secure cookies, WebAuthn/passkeys, service workers, geolocation,
+clipboard access) either don't work at all or behave differently on plain
+`http://localhost`, and testing that behavior against a mismatched
+environment is its own source of "works locally, breaks in review" bugs.
+`runsslserver` gives you a self-signed HTTPS dev server with no extra
+setup, so what you're testing locally matches what actually ships.
+
+### Why fsnotify, not Django's own reloader
+
+`server` passes `--noreload` to the supervised process and does its own
+file-watching instead, using [fsnotify](https://github.com/fsnotify/fsnotify)
+— OS-level file system events (inotify on Linux, FSEvents on macOS), not
+polling. Django's built-in `StatReloader` works by re-`stat()`-ing every
+watched file on an interval and diffing mtimes; fsnotify gets told about a
+change the moment the OS knows about it, no polling loop involved. Since
+enigma-cli's watcher already owns "restart on change", leaving Django's own
+reloader enabled on top would just mean two watchers doing the same job —
+`--noreload` turns that off.
+
+Any `*.py`/`*.html`/`.env` change (excluding the two generated files and
+anything under `__pycache__`) restarts the server; a narrower
+Create/Remove/Rename of a `.py` file under an `api/` directory also
+regenerates the routes first. A newly created, empty API file gets
+scaffolded with view boilerplate.
 
 ## Integrating with your project
 
