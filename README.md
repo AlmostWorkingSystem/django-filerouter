@@ -7,6 +7,45 @@ every API view module just to answer questions like "what routes exist" or
 "should I restart" — this tool answers them by statically scanning the
 filesystem instead, which is significantly faster in both CI and local dev.
 
+## Why
+
+A Python-based scanner that walks your view tree has to `import_module()`
+every candidate file just to check whether it defines an `APIView` class —
+there's no way to ask "does this file define this class" without either
+parsing the source or actually running it, and running it means paying
+Django's full import graph (models, serializers, middleware) for a file you
+might not even route to. enigma-cli answers that question with a regex over
+the raw source instead, so discovering your routes costs nothing more than
+reading files off disk — no Python interpreter involved, no import graph to
+pay for, whether that scan runs in CI, a Docker build, or a local dev loop.
+
+That single design choice — never importing Python to answer a question
+about Python — is what makes everything else possible:
+
+- **Two independent read/write speeds instead of one.** The two generated
+  files split cleanly along a real boundary: `_enigma.py`
+  (`INSTALLED_APPS`/`ENIGMA_CONFIG`) has to be safe to import *before*
+  Django's app registry exists, and `_routes.py` (`urlpatterns`) only makes
+  sense *after* it does. Treating them as one file (an earlier version of
+  this tool tried) hides that boundary and breaks the moment either file's
+  content needs something the other side doesn't have yet.
+- **A real choice between boot speed and request-serving consistency,
+  instead of one fixed tradeoff.** Eager mode resolves every view once, at
+  import time — nothing to resolve again per-request, which is what
+  production wants. Lazy mode defers each view's import to first use —
+  much faster to get a dev server running, which is what a local
+  edit-save-reload loop wants. Neither is compromised to make room for the
+  other; you pick per environment via one flag.
+- **The generated output has no runtime dependency on this tool at all.**
+  Once `_enigma.py`/`_routes.py` exist, Django only ever imports plain
+  Python — enigma-cli doesn't need to be installed, running, or even
+  present for the app to boot and serve requests. It's only needed at
+  generation time (a dev loop, a CI step, a Docker build stage).
+- **The dev-server loop owns exactly one watcher, not two.** Supervising
+  the actual server process here means Django's own built-in autoreloader
+  is redundant and gets explicitly disabled — one file-watcher deciding
+  when to regenerate and restart, not two racing each other.
+
 ## What it expects from your project
 
 enigma-cli assumes a Django project laid out like this:
@@ -40,6 +79,42 @@ your-project/
   segment. A module-level `url_prefix = "..."` or `url_name = "..."` in a
   view file overrides the segment/name Django would otherwise derive from
   its filename.
+
+## Installation
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlmostWorkingSystem/enigma-cli/main/install.sh | sh
+```
+
+Installs the latest release to `/usr/local/bin` for your OS/arch
+(`linux/amd64`, `linux/arm64`, or `darwin/arm64`). Pin a specific version
+or change the install directory with environment variables:
+
+```bash
+ENIGMA_CLI_VERSION=v0.1.0 BINDIR="$HOME/.local/bin" \
+  curl -fsSL https://raw.githubusercontent.com/AlmostWorkingSystem/enigma-cli/main/install.sh | sh
+```
+
+Inside a Dockerfile, pin the version explicitly and detect the target
+architecture rather than relying on the installer script's own `uname`
+detection matching the build host (cross-builds mean those can differ):
+
+```dockerfile
+ARG ENIGMA_CLI_VERSION=v0.1.0
+RUN ARCH="$(uname -m)"; case "$ARCH" in \
+        x86_64) ARCH=amd64 ;; \
+        aarch64|arm64) ARCH=arm64 ;; \
+        *) echo "unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/AlmostWorkingSystem/enigma-cli/releases/download/${ENIGMA_CLI_VERSION}/enigma-cli_linux_${ARCH}.tar.gz" \
+        -o /tmp/enigma-cli.tar.gz && \
+    tar -xzf /tmp/enigma-cli.tar.gz -C /usr/local/bin enigma-cli && \
+    rm /tmp/enigma-cli.tar.gz && \
+    chmod +x /usr/local/bin/enigma-cli
+```
+
+Or build from source instead of installing a release binary — see
+[Development](#development).
 
 ## Usage
 
@@ -106,6 +181,48 @@ not just different content:
   which cascade into Django's own auth models defining a real Model class
   before the app registry existed to hold it — an immediate
   `AppRegistryNotReady` crash.
+
+## Wiring the generated files into your project
+
+`_enigma.py` needs to be read wherever your project builds `INSTALLED_APPS`
+— for a typical `settings.py`, that's the settings module itself, since its
+top-level code runs the first time anything touches `settings.INSTALLED_APPS`,
+which is inherently before Django's app registry populates:
+
+```python
+# settings.py
+from importlib import import_module
+
+_enigma = import_module("_enigma")
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    # ...your other fixed apps...
+] + _enigma.INSTALLED_APPS
+
+# if you want the parsed module/submodule tree available at runtime
+ENIGMA_CONFIG = _enigma.ENIGMA_CONFIG
+```
+
+`_routes.py` needs to be read wherever your root URLconf builds
+`urlpatterns` — this one has no ordering constraint beyond "after
+`django.setup()`", which is already guaranteed by the time Django ever
+imports your URLconf module at all:
+
+```python
+# urls.py
+from importlib import import_module
+
+urlpatterns = [
+    # ...your own fixed URLs (admin, health checks, schema, etc.)...
+] + import_module("_routes").urlpatterns
+```
+
+Both files are plain generated Python — add them to your `.gitignore`
+alongside your other build artifacts, and regenerate with
+`enigma-cli makeurls` (or run `enigma-cli server` for the dev loop, which
+regenerates them automatically on relevant file changes).
 
 ## Releases
 
