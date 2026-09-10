@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routegen"
 )
 
 func TestGenerate_WritesConfigAndRoutesFiles(t *testing.T) {

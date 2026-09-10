@@ -1,4 +1,4 @@
-module github.com/AlmostWorkingSystem/enigma-cli
+module github.com/AlmostWorkingSystem/django-filerouter
 
 go 1.27.1
 

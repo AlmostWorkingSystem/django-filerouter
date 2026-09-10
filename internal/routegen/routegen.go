@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routescan"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routescan"
 )
 
 // Mode selects how RenderRoutes resolves each route's view class.

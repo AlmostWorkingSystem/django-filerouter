@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routescan"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routegen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routescan"
 )
 
 // TestMakeURLsMatchesPythonOutput compares enigma-cli's Eager-mode
@@ -32,7 +32,7 @@ func TestMakeURLsMatchesPythonOutput(t *testing.T) {
 
 	wantBytes, err := os.ReadFile(root + "/_routes.py")
 	if err != nil {
-		t.Fatalf("reading existing _routes.py (set ENIGMA_CLI_TEST_ROOT if camera_infra isn't a sibling, or generate one first with `enigma-cli makeurls`): %v", err)
+		t.Fatalf("reading existing _routes.py (set DJANGO_FILEROUTER_TEST_ROOT if camera_infra isn't a sibling, or generate one first with `django-filerouter makeurls`): %v", err)
 	}
 
 	got := routegen.RenderRoutes(routes, routegen.Eager)
@@ -103,7 +103,7 @@ func TestRenderConfigNeverImportsDjangoAtRealScale(t *testing.T) {
 func scanRealRepo(t *testing.T) (root string, cfg *enigmaconfig.Config, routes []routescan.RouteEntry) {
 	t.Helper()
 
-	root = os.Getenv("ENIGMA_CLI_TEST_ROOT")
+	root = os.Getenv("DJANGO_FILEROUTER_TEST_ROOT")
 	if root == "" {
 		root = "../../../camera_infra"
 	}

@@ -1,13 +1,15 @@
 version: 2
 
+project_name: django-filerouter
+
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: enigma-cli
-    main: ./cmd/enigma-cli
-    binary: enigma-cli
+  - id: django-filerouter
+    main: ./cmd/django-filerouter
+    binary: django-filerouter
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -23,7 +25,7 @@ builds:
         goarch: amd64
 
 archives:
-  - id: enigma-cli
+  - id: django-filerouter
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}
@@ -41,4 +43,4 @@ changelog:
 release:
   github:
     owner: AlmostWorkingSystem
-    name: enigma-cli
+    name: django-filerouter

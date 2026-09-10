@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
 )
 
 func TestScan(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routescan"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routescan"
 )
 
 func TestCapitalize(t *testing.T) {

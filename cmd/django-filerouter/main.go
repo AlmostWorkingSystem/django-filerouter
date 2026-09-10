@@ -10,11 +10,11 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/apitemplate"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/appgen"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/supervisor"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/watch"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/apitemplate"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/appgen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routegen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/supervisor"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/watch"
 )
 
 // version is set at build time via -ldflags "-X main.version=..." (see
@@ -34,7 +34,7 @@ func main() {
 	case "server":
 		runServer(os.Args[2:])
 	case "version", "--version", "-v":
-		fmt.Println("enigma-cli", version)
+		fmt.Println("django-filerouter", version)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		usage()
@@ -43,7 +43,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: enigma-cli <makeurls|server|version> [--root path] [--dev] [addr]")
+	fmt.Fprintln(os.Stderr, "usage: django-filerouter <makeurls|server|version> [--root path] [--dev] [addr]")
 }
 
 // resolveMode returns Eager unless --dev is set. Eager is the production
@@ -83,7 +83,7 @@ func runServer(args []string) {
 	skipChecks := fs.Bool("skip-checks", false, "pass --skip-checks through to the supervised runsslserver, skipping Django's system checks")
 	fs.Parse(args)
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: enigma-cli server [--root path] [--dev] [--skip-checks] <addr>")
+		fmt.Fprintln(os.Stderr, "usage: django-filerouter server [--root path] [--dev] [--skip-checks] <addr>")
 		os.Exit(1)
 	}
 	addr := fs.Arg(0)
@@ -96,7 +96,7 @@ func runServer(args []string) {
 	}
 	fmt.Printf("URL generation completed in %s.\n", elapsed)
 
-	// --noreload: enigma-cli's own watch+supervisor already restarts the
+	// --noreload: django-filerouter's own watch+supervisor already restarts the
 	// child on file changes, exactly what the real server.py did too
 	// (setting use_reloader=False on its own re-exec'd child) — Django's
 	// built-in StatReloader would otherwise re-exec the process a second

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routegen"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/routescan"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routegen"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/routescan"
 )
 
 // Generate runs the full makeurls pipeline against root and writes two

@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/enigmaconfig"
-	"github.com/AlmostWorkingSystem/enigma-cli/internal/pyscan"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/enigmaconfig"
+	"github.com/AlmostWorkingSystem/django-filerouter/internal/pyscan"
 )
 
 type RouteEntry struct {
