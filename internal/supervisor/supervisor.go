@@ -32,6 +32,7 @@ func (s *Supervisor) startLocked() error {
 	cmd.Dir = s.dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	setPdeathsig(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
