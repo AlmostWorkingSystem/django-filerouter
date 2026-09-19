@@ -4,8 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
-	"time"
 )
 
 // Supervisor owns the lifecycle of exactly one child process (in
@@ -41,8 +39,11 @@ func (s *Supervisor) startLocked() error {
 	return nil
 }
 
-// Restart terminates the running child (SIGTERM, then SIGKILL after a
-// grace period if it doesn't exit) and starts a fresh one.
+// Restart kills the running child immediately and waits for it to be fully
+// reaped before starting a fresh one — no grace period. A graceful
+// SIGTERM-then-wait here would risk starting the new process (which binds
+// the same address) before the old one has actually released its listening
+// socket, producing "address already in use" on the new child.
 func (s *Supervisor) Restart() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -63,17 +64,8 @@ func (s *Supervisor) stopLocked() error {
 		return nil
 	}
 	proc := s.cmd.Process
-	_ = proc.Signal(syscall.SIGTERM)
-
-	done := make(chan error, 1)
-	go func() { done <- s.cmd.Wait() }()
-
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
-		_ = proc.Kill()
-		<-done
-	}
+	_ = proc.Kill()
+	_ = s.cmd.Wait()
 	s.cmd = nil
 	return nil
 }
