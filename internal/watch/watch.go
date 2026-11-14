@@ -25,7 +25,7 @@ type Event struct {
 // files — see routegen.RenderConfig/RenderRoutes) since either being
 // rewritten by a regenerate must never itself trigger another restart
 // loop. This is the single "does this event even get considered" gate — it
-// accepts ALL fsnotify ops (Create, Write, Remove, Rename), matching
+// accepts every fsnotify op except a bare Chmod (Create, Write, Remove, Rename), matching
 // Python's on_any_event being invoked for every non-ignored, non-debounced
 // event regardless of type. It does NOT decide whether to regenerate
 // makeurls (see IsAPIFileChange) or whether to restart (every event that
@@ -65,7 +65,8 @@ func isQualifyingPath(name string) bool {
 }
 
 func (f *filter) shouldTrigger(ev fsnotify.Event) bool {
-	if !isQualifyingPath(ev.Name) {
+	// macOS kqueue reports an access-time bump from any reader (git status pollers, editors) as Chmod.
+	if ev.Op == fsnotify.Chmod || !isQualifyingPath(ev.Name) {
 		return false
 	}
 

@@ -24,6 +24,16 @@ func TestShouldTrigger_AcceptsPlainWrite(t *testing.T) {
 	}
 }
 
+func TestShouldTrigger_IgnoresChmodOnly(t *testing.T) {
+	f := newFilter(500 * time.Millisecond)
+	if f.shouldTrigger(fsnotify.Event{Name: "modules/demo/services/widget.py", Op: fsnotify.Chmod}) {
+		t.Fatalf("a bare chmod (atime bump from a reader) must not restart the server")
+	}
+	if !f.shouldTrigger(fsnotify.Event{Name: "modules/demo/services/widget.py", Op: fsnotify.Write | fsnotify.Chmod}) {
+		t.Fatalf("a write that also carries chmod must still trigger")
+	}
+}
+
 func TestShouldTrigger_AcceptsWriteOutsideAPIDir(t *testing.T) {
 	f := newFilter(500 * time.Millisecond)
 	if !f.shouldTrigger(fsnotify.Event{Name: "modules/demo/services/widget.py", Op: fsnotify.Write}) {
