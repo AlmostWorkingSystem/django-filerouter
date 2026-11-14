@@ -1,6 +1,9 @@
 package watch
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -128,5 +131,28 @@ func TestIsAPIFileChange_FalseForNonAPIPath(t *testing.T) {
 func TestIsAPIFileChange_FalseForHTMLUnderAPIDir(t *testing.T) {
 	if IsAPIFileChange(Event{Path: "modules/demo/api/v1/widget.html", Op: fsnotify.Create}) {
 		t.Fatalf("only .py files qualify as API file changes, not .html")
+	}
+}
+
+func TestWalkDirs_SkipsDotDirsAndSkipPatterns(t *testing.T) {
+	root := t.TempDir()
+	for _, d := range []string{"app/api", ".venv", "web/node_modules/pkg", "frontend/src", "docs/build"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var got []string
+	if err := walkDirs(root, []string{"node_modules", "frontend", "docs/*"}, func(dir string) error {
+		rel, _ := filepath.Rel(root, dir)
+		got = append(got, filepath.ToSlash(rel))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{".", "app", "app/api", "docs", "web"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("walkDirs visited %v, want %v", got, want)
 	}
 }

@@ -116,7 +116,7 @@ Both subcommands take `--root` (default `.`) and `--config` (default
 
 ```bash
 django-filerouter makeurls [--root path] [--dev] [--config name]
-django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] <addr>
+django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] [--skip glob]... <addr>
 django-filerouter version   # or --version / -v
 ```
 
@@ -126,6 +126,7 @@ django-filerouter version   # or --version / -v
 | `--skip-checks` | Forwarded to the supervised `runsslserver`, skipping Django's system-check pass |
 | `--root` | Path to the Django project root (default `.`) |
 | `--config` | Name of the config file to read, relative to `--root` (default `enigma-config.yaml`) |
+| `--skip` | `server` only, repeatable: glob of a directory the file watcher ignores, matched against its name (`node_modules`) or its path relative to `--root` (`frontend`). Dot-directories are always skipped. Use it for big trees inside the project, since macOS watches each file with its own file handle and runs out (`too many open files`) |
 
 ### Why `runsslserver`, not `runserver`
 

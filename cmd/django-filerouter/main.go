@@ -84,9 +84,14 @@ func runServer(args []string) {
 	dev := fs.Bool("dev", false, "generate the dev-loop (lazy-loading) route format instead of the production format")
 	skipChecks := fs.Bool("skip-checks", false, "pass --skip-checks through to the supervised runsslserver, skipping Django's system checks")
 	config := fs.String("config", enigmaconfig.DefaultFileName, "name of the config file to read, relative to --root")
+	var skip []string
+	fs.Func("skip", "glob of a directory the file watcher ignores, matched against its name or its path relative to --root (repeatable)", func(v string) error {
+		skip = append(skip, v)
+		return nil
+	})
 	fs.Parse(args)
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] <addr>")
+		fmt.Fprintln(os.Stderr, "usage: django-filerouter server [--root path] [--dev] [--skip-checks] [--config name] [--skip glob]... <addr>")
 		os.Exit(1)
 	}
 	addr := fs.Arg(0)
@@ -115,7 +120,7 @@ func runServer(args []string) {
 		os.Exit(1)
 	}
 
-	stopWatch, err := watch.Watch(*root, 500*time.Millisecond, func(ev watch.Event) {
+	stopWatch, err := watch.Watch(*root, 500*time.Millisecond, skip, func(ev watch.Event) {
 		// IsAPIFileChange gates the narrower "regenerate routes" behavior;
 		// every qualifying event reaching this callback restarts the
 		// supervised server regardless, matching the real Python dev

@@ -103,12 +103,12 @@ func IsAPIFileChange(ev Event) bool {
 // IsAPIFileChange on the resulting Event to decide whether it also
 // warrants a makeurls regeneration.
 // It returns a stop function to tear the watcher down.
-func Watch(root string, debounce time.Duration, onQualifying func(Event)) (func(), error) {
+func Watch(root string, debounce time.Duration, skip []string, onQualifying func(Event)) (func(), error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
-	if err := addRecursive(w, root); err != nil {
+	if err := addRecursive(w, root, skip); err != nil {
 		w.Close()
 		return nil, err
 	}
@@ -142,13 +142,13 @@ func Watch(root string, debounce time.Duration, onQualifying func(Event)) (func(
 	}, nil
 }
 
-func addRecursive(w *fsnotify.Watcher, root string) error {
-	return walkDirs(root, func(dir string) error {
+func addRecursive(w *fsnotify.Watcher, root string, skip []string) error {
+	return walkDirs(root, skip, func(dir string) error {
 		return w.Add(dir)
 	})
 }
 
-func walkDirs(root string, fn func(dir string) error) error {
+func walkDirs(root string, skip []string, fn func(dir string) error) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -156,9 +156,27 @@ func walkDirs(root string, fn func(dir string) error) error {
 		if !d.IsDir() {
 			return nil
 		}
-		if strings.HasPrefix(d.Name(), ".") && path != root {
+		if path != root && (strings.HasPrefix(d.Name(), ".") || matchesSkip(root, path, skip)) {
 			return filepath.SkipDir
 		}
 		return fn(path)
 	})
+}
+
+// A pattern matches either the directory's name ("node_modules") or its slash path relative to root ("frontend").
+func matchesSkip(root, path string, skip []string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	for _, pattern := range skip {
+		if ok, _ := filepath.Match(pattern, filepath.Base(path)); ok {
+			return true
+		}
+		if ok, _ := filepath.Match(pattern, rel); ok {
+			return true
+		}
+	}
+	return false
 }
